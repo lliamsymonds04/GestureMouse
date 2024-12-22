@@ -23,6 +23,7 @@ class HandTracker:
         self.mp_hands = mediapipe.solutions.hands
         self.mp_drawing = mediapipe.solutions.drawing_utils
         self.landmark_result = None
+        self.processing_hand = False
 
         self.previous_position = None
         self.velocity = (0,0)
@@ -45,19 +46,21 @@ class HandTracker:
 
     def handle_detection(self, result: HandLandmarkerResult, output_image: mediapipe.Image, timestamp_ms: int):
         self.landmark_result = result
+        self.processing_hand = False
 
     #going to need delta time
-    def update(self):
+    def update(self, dt: float):
         ret, frame = self.cap.read()
 
         mp_image = mediapipe.Image(image_format=mediapipe.ImageFormat.SRGB, data=numpy.array(frame))
 
         # Call the async detection method
         now = time.time()
-        self.landmarker.detect_async(mp_image, timestamp_ms=int((now - self.start_time) * 1000))
+        if not self.processing_hand:
+            self.processing_hand = True
+            self.landmarker.detect_async(mp_image, timestamp_ms=int((now - self.start_time) * 1000))
 
-        dt = now - self.previous_time
-
+        updated_velocity = False
         if self.landmark_result is not None:
             result: HandLandmarkerResult = self.landmark_result
 
@@ -70,9 +73,13 @@ class HandTracker:
                 if self.previous_position is not None:
                     displacement = (index_knuckle.x - self.previous_position.x, index_knuckle.y - self.previous_position.y)
                     self.velocity = (displacement[0]/dt, displacement[1]/dt)
+                    updated_velocity = True
 
 
                 self.previous_position = index_knuckle
 
-        #update previous position
+        if not updated_velocity:
+            self.velocity = (0,0)
+
+        # update previous position
         self.previous_time = now
