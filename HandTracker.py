@@ -60,17 +60,19 @@ class HandTracker:
 
         if self.landmark_result is not None:
             result: HandLandmarkerResult = self.landmark_result
-            hand_info = result.handedness[0][0]
-            landmarks = result.hand_landmarks[0]
 
-            index_knuckle = landmarks[5]
+            if len(result.handedness) > 0:
+                hand_info = result.handedness[0][0]
+                landmarks = result.hand_landmarks[0]
 
-            if self.previous_position is not None:
-                displacement = (index_knuckle.x - self.previous_position.x, index_knuckle.y - self.previous_position.y)
-                self.velocity = (displacement[0]/dt, displacement[1]/dt)
+                index_knuckle = landmarks[5]
+
+                if self.previous_position is not None:
+                    displacement = (index_knuckle.x - self.previous_position.x, index_knuckle.y - self.previous_position.y)
+                    self.velocity = (displacement[0]/dt, displacement[1]/dt)
 
 
-            self.previous_position = index_knuckle
+                self.previous_position = index_knuckle
 
         #update previous position
         self.previous_time = now
