@@ -8,7 +8,7 @@ from MouseController import MouseController
 if __name__ == "__main__":
     pass
 
-    hand_tracker = HandTracker(model_path='Models\\hand_landmarker.task', debug_mode=True)
+    hand_tracker = HandTracker(model_path='Models\\hand_landmarker.task', debug_mode=False)
     mouse_controller = MouseController()
 
     prev_time = time.time()
@@ -17,7 +17,7 @@ if __name__ == "__main__":
         dt = max(now - prev_time, 1/100)
 
         hand_tracker.update(dt)
-        mouse_controller.update(hand_tracker.wrist_tracker, dt) #will need to scale this by delta time
+        mouse_controller.update(hand_tracker.trackers, dt) #will need to scale this by delta time
 
         prev_time = now
 
