@@ -2,7 +2,9 @@ import cv2
 import mediapipe
 import numpy
 import time
+import collections
 
+from PointTracker import PointTracker
 
 BaseOptions = mediapipe.tasks.BaseOptions
 HandLandmarker = mediapipe.tasks.vision.HandLandmarker
@@ -10,14 +12,22 @@ HandLandmarkerOptions = mediapipe.tasks.vision.HandLandmarkerOptions
 HandLandmarkerResult = mediapipe.tasks.vision.HandLandmarkerResult
 VisionRunningMode = mediapipe.tasks.vision.RunningMode
 
+DEBUG_WINDOW_NAME = "Camera"
+HAND_TO_TRACK = "right"
 
+#flip the hand bc media pipe labels them wrong
+if HAND_TO_TRACK.lower() == "right":
+    HAND_TO_TRACK = "Left"
+else:
+    HAND_TO_TRACK = "Right"
 
 class HandTracker:
-    def __init__(self, model_path: str):
+    def __init__(self, model_path: str, debug_mode: bool = False):
         self.cap = cv2.VideoCapture(0)
         self.start_time = time.time()
         self.previous_time = self.start_time
         self.model_path = model_path
+        self.debug_mode = debug_mode
 
         # Initialize Mediapipe components
         self.mp_hands = mediapipe.solutions.hands
@@ -25,23 +35,25 @@ class HandTracker:
         self.landmark_result = None
         self.processing_hand = False
 
-        self.previous_position = None
-        self.velocity = (0,0)
+        self.index_finger_tracker = PointTracker(3, 8)
+        self.wrist_tracker = PointTracker(3, 0)
+
+        self.trackers = [self.index_finger_tracker, self.wrist_tracker]
 
         options = mediapipe.tasks.vision.HandLandmarkerOptions(
             base_options=mediapipe.tasks.BaseOptions(model_asset_path=self.model_path),
             running_mode=mediapipe.tasks.vision.RunningMode.LIVE_STREAM,
-            num_hands=1,
+            num_hands=2,
             result_callback=self.handle_detection,
-            min_tracking_confidence=0.4,
+            min_tracking_confidence=0.5,
             min_hand_detection_confidence=0.5,
             min_hand_presence_confidence=0.5,
         )
 
         self.landmarker = mediapipe.tasks.vision.HandLandmarker.create_from_options(options)
 
-        #need a shadowing method to track position
-        #need to track change in velocity
+        if debug_mode:
+            cv2.namedWindow(DEBUG_WINDOW_NAME, cv2.WINDOW_NORMAL)
 
 
     def handle_detection(self, result: HandLandmarkerResult, output_image: mediapipe.Image, timestamp_ms: int):
@@ -52,6 +64,10 @@ class HandTracker:
     def update(self, dt: float):
         ret, frame = self.cap.read()
 
+        if not ret:
+            print("Failed to grab frame")
+            return
+
         mp_image = mediapipe.Image(image_format=mediapipe.ImageFormat.SRGB, data=numpy.array(frame))
 
         # Call the async detection method
@@ -60,26 +76,49 @@ class HandTracker:
             self.processing_hand = True
             self.landmarker.detect_async(mp_image, timestamp_ms=int((now - self.start_time) * 1000))
 
-        updated_velocity = False
+        detected_hand = False
         if self.landmark_result is not None:
             result: HandLandmarkerResult = self.landmark_result
 
-            if len(result.handedness) > 0:
-                hand_info = result.handedness[0][0]
-                landmarks = result.hand_landmarks[0]
+            for handedness in result.handedness:
+                hand = handedness[0]
+                if detected_hand or hand.display_name != HAND_TO_TRACK:
+                    continue
 
-                index_knuckle = landmarks[5]
+                detected_hand = True
 
-                if self.previous_position is not None:
-                    displacement = (index_knuckle.x - self.previous_position.x, index_knuckle.y - self.previous_position.y)
-                    self.velocity = (displacement[0]/dt, displacement[1]/dt)
-                    updated_velocity = True
+                if len(result.hand_landmarks) > 1:
+                    landmarks = result.hand_landmarks[hand.index]
+                else:
+                    landmarks = result.hand_landmarks[0]
 
+                #update the point trackers
+                for tracker in self.trackers:
+                    mark = landmarks[tracker.landmark_index]
+                    tracker.update_point(mark.x, mark.y, mark.z)
 
-                self.previous_position = index_knuckle
-
-        if not updated_velocity:
-            self.velocity = (0,0)
+        if not detected_hand:
+            for tracker in self.trackers:
+                tracker.update_point(tracker.x, tracker.y, tracker.z) #pass the same point so it stays stationary
 
         # update previous position
         self.previous_time = now
+
+        if self.debug_mode:
+            mp_image_np = numpy.array(mp_image.numpy_view())
+
+            if detected_hand:
+                height, width, depth = frame.shape
+
+                for tracker in self.trackers:
+                    x,y = int(tracker.x  * width), int(tracker.y * height)
+
+                    cv2.circle(mp_image_np, (x, y), 10, (255, 0, 0), 2)
+
+            cv2.imshow(DEBUG_WINDOW_NAME, mp_image_np)
+
+
+    def close(self):
+        self.cap.release()
+        if self.debug_mode:
+            cv2.destroyAllWindows()
