@@ -35,10 +35,11 @@ class HandTracker:
         self.landmark_result = None
         self.processing_hand = False
 
-        self.index_finger_tracker = PointTracker(3, 8)
-        self.wrist_tracker = PointTracker(3, 0)
-
-        self.trackers = [self.index_finger_tracker, self.wrist_tracker]
+        self.trackers = {
+            "index finger": PointTracker(3,8),
+            "middle finger": PointTracker(3, 12),
+            "wrist": PointTracker(3,0),
+        }
 
         options = mediapipe.tasks.vision.HandLandmarkerOptions(
             base_options=mediapipe.tasks.BaseOptions(model_asset_path=self.model_path),
@@ -93,12 +94,12 @@ class HandTracker:
                     landmarks = result.hand_landmarks[0]
 
                 #update the point trackers
-                for tracker in self.trackers:
+                for _, tracker in self.trackers.items():
                     mark = landmarks[tracker.landmark_index]
                     tracker.update_point(mark.x, mark.y, mark.z)
 
         if not detected_hand:
-            for tracker in self.trackers:
+            for _, tracker in self.trackers.items():
                 tracker.update_point(tracker.x, tracker.y, tracker.z) #pass the same point so it stays stationary
 
         # update previous position
