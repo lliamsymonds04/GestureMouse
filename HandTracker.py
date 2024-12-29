@@ -38,6 +38,12 @@ class HandTracker:
         self.trackers = {
             "index finger": PointTracker(3,8),
             "middle finger": PointTracker(3, 12),
+            "ring finger": PointTracker(3, 16),
+            "pinky finger": PointTracker(3, 20),
+            "index knuckle": PointTracker(3, 5),
+            "middle knuckle": PointTracker(3, 9),
+            "ring knuckle": PointTracker(3, 13),
+            "pinky knuckle": PointTracker(3, 17),
             "wrist": PointTracker(3,0),
         }
 
@@ -111,7 +117,7 @@ class HandTracker:
             if detected_hand:
                 height, width, depth = frame.shape
 
-                for tracker in self.trackers:
+                for _, tracker in self.trackers.items():
                     x,y = int(tracker.x  * width), int(tracker.y * height)
 
                     cv2.circle(mp_image_np, (x, y), 10, (255, 0, 0), 2)

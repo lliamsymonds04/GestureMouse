@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
         prev_time = now
 
-        if cv2.waitKey(1) & 0xFF == 27: #esc key
+        if (cv2.waitKey(1) & 0xFF == 27) or keyboard.is_pressed('esc'): #esc key
             print("exiting...")
             hand_tracker.close()
             break

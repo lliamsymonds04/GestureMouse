@@ -1,6 +1,7 @@
 import math
 import mouse
 import pyautogui
+from pynput.mouse import Button, Controller
 
 #SENSIVITY VARS
 SENSITIVITY_X = 1.5
@@ -11,6 +12,11 @@ JUMP_MULTIPLIER = 2
 #CLICKS
 CLICK_VELOCITY = 0.1
 CLICK_DEBOUNCE = 0.1
+SIDE_BUTTON_DEBOUNCE = 0.5
+BACK_BUTTON_VELOCITY_THRESHOLD = 0.25
+
+SCROLL_FACTOR = 50
+SCROLL_VELOCITY_THRESHOLD = 0.25
 
 from PointTracker import PointTracker
 from Debounce import Debounce
@@ -21,41 +27,96 @@ def calculate_magnitude(v: (float, float)) -> float:
 def log_curve(x: float, a: float):
     return math.copysign(math.log(abs(x) + 1) + 1, x) * a
 
+finger_names = ["index", "middle", "ring", "pinky"]
+
+mouse2 = Controller()
+
 class MouseController:
     def __init__(self):
         self.left_click_debounce = Debounce(CLICK_DEBOUNCE)
         self.right_click_debounce = Debounce(CLICK_DEBOUNCE)
+        self.side_button_debounce = Debounce(SIDE_BUTTON_DEBOUNCE)
+        self.state = "open"
 
     def update(self, trackers: dict[str, PointTracker], dt: float):
         wrist_tracker = trackers["wrist"]
         displacement_magnitude = calculate_magnitude(wrist_tracker.displacement)
 
+        fingers_down = [0,0,0,0]
+        fingers_moving = False
+        for i, finger_name in enumerate(finger_names):
+            finger_tracker = trackers[f"{finger_name} finger"]
+            knuckle_tracker = trackers[f"{finger_name} knuckle"]
+
+            # relative_displacement = finger_tracker.displacement - wrist_tracker.displacement
+            # relative_displacement = tuple(a - b for a in finger_tracker.displacement for b in wrist_tracker.displacement)
+
+            # y_vel = relative_displacement[1]/dt
+            y_vel = (finger_tracker.y-wrist_tracker.y) / dt
+            if abs(y_vel) > CLICK_VELOCITY:
+                fingers_moving = True
+                break
+
+            if finger_tracker.y > knuckle_tracker.y:
+                fingers_down[i] = 1
+
+        if fingers_moving:
+            self.state = "transitioning"
+        elif fingers_down[0] == 1 and fingers_down[1] == 1 and fingers_down[2] == 1 and fingers_down[3] == 1:
+            self.state = "closed"
+        elif fingers_down[0] == 0 and fingers_down[1] == 0 and fingers_down[2] == 1 and fingers_down[3] == 1:
+            self.state = "two up"
+        else:
+            self.state = "open"
+
         if displacement_magnitude > 0.001:
-            screen_width, screen_height = pyautogui.size()
+            if self.state == "open":
+                screen_width, screen_height = pyautogui.size()
 
-            vel = tuple(d/dt for d in wrist_tracker.displacement)
-            speed = calculate_magnitude(vel)
+                vel = tuple(d/dt for d in wrist_tracker.displacement)
+                speed = calculate_magnitude(vel)
 
-            sens_scale = 1
-            if speed > JUMP_SPEED_THRESHOLD:
-                sens_scale *= JUMP_MULTIPLIER
+                sens_scale = 1
+                if speed > JUMP_SPEED_THRESHOLD:
+                    sens_scale *= JUMP_MULTIPLIER
 
-            x = int(wrist_tracker.displacement[0] * screen_width * SENSITIVITY_X * sens_scale)
-            y = int(wrist_tracker.displacement[1] * screen_height * SENSITIVITY_Y * sens_scale)
-            mouse.move(x, y, False)
+                x = int(wrist_tracker.displacement[0] * screen_width * SENSITIVITY_X * sens_scale)
+                y = int(wrist_tracker.displacement[1] * screen_height * SENSITIVITY_Y * sens_scale)
+                mouse.move(x, y, False)
+            elif self.state == "two up":
+                x_vel = wrist_tracker.displacement[0]/dt
+
+                if x_vel < - BACK_BUTTON_VELOCITY_THRESHOLD and self.side_button_debounce:
+                    self.side_button_debounce.activate()
+                    mouse2.press(Button.x1)
+                    mouse2.release(Button.x1)
+                elif x_vel > BACK_BUTTON_VELOCITY_THRESHOLD and self.side_button_debounce:
+                    self.side_button_debounce.activate()
+                    mouse2.press(Button.x2)
+                    mouse2.release(Button.x2)
+            elif self.state == "closed":
+                # print(int(wrist_tracker.displacement[1] * SCROLL_FACTOR))
+                # mouse.wheel(int(wrist_tracker.displacement[1] * SCROLL_FACTOR))
+                if wrist_tracker.displacement[1]/dt > SCROLL_VELOCITY_THRESHOLD:
+                    mouse.wheel(1)
+                elif wrist_tracker.displacement[1]/dt < -SCROLL_VELOCITY_THRESHOLD:
+                    mouse.wheel(-1)
+
+
         else: #stationary
-            if self.left_click_debounce:
-                index_finger_tracker = trackers["index finger"]
-                y_vel = index_finger_tracker.displacement[1]/dt
+            if self.state != "closed":
+                if self.left_click_debounce:
+                    index_finger_tracker = trackers["index finger"]
+                    y_vel = index_finger_tracker.displacement[1]/dt
 
-                if y_vel > CLICK_VELOCITY:
-                    self.left_click_debounce.activate()
-                    mouse.click()
+                    if y_vel > CLICK_VELOCITY:
+                        self.left_click_debounce.activate()
+                        mouse.click()
 
-            if self.right_click_debounce:
-                right_finger_tracker = trackers["index finger"]
-                y_vel = right_finger_tracker.displacement[1] / dt
+                if self.right_click_debounce:
+                    right_finger_tracker = trackers["middle finger"]
+                    y_vel = right_finger_tracker.displacement[1] / dt
 
-                if y_vel > CLICK_VELOCITY:
-                    self.right_click_debounce.activate()
-                    mouse.right_click()
+                    if y_vel > CLICK_VELOCITY:
+                        self.right_click_debounce.activate()
+                        mouse.right_click()
