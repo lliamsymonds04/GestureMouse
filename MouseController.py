@@ -15,6 +15,7 @@ CLICK_DEBOUNCE = 0.1
 SIDE_BUTTON_DEBOUNCE = 0.5
 BACK_BUTTON_VELOCITY_THRESHOLD = 0.25
 
+#scrolling
 SCROLL_FACTOR = 50
 SCROLL_VELOCITY_THRESHOLD = 0.25
 
@@ -43,31 +44,27 @@ class MouseController:
         displacement_magnitude = calculate_magnitude(wrist_tracker.displacement)
 
         fingers_down = [0,0,0,0]
-        fingers_moving = False
+        moving_fingers = 0
         for i, finger_name in enumerate(finger_names):
             finger_tracker = trackers[f"{finger_name} finger"]
             knuckle_tracker = trackers[f"{finger_name} knuckle"]
 
-            # relative_displacement = finger_tracker.displacement - wrist_tracker.displacement
-            # relative_displacement = tuple(a - b for a in finger_tracker.displacement for b in wrist_tracker.displacement)
-
-            # y_vel = relative_displacement[1]/dt
-            y_vel = (finger_tracker.y-wrist_tracker.y) / dt
+            y_vel = (finger_tracker.displacement[1] - wrist_tracker.displacement[1]) / dt
             if abs(y_vel) > CLICK_VELOCITY:
-                fingers_moving = True
+                moving_fingers += 1
                 break
 
             if finger_tracker.y > knuckle_tracker.y:
                 fingers_down[i] = 1
 
-        if fingers_moving:
-            self.state = "transitioning"
-        elif fingers_down[0] == 1 and fingers_down[1] == 1 and fingers_down[2] == 1 and fingers_down[3] == 1:
+        if fingers_down[0] == 1 and fingers_down[1] == 1 and fingers_down[2] == 1 and fingers_down[3] == 1:
             self.state = "closed"
         elif fingers_down[0] == 0 and fingers_down[1] == 0 and fingers_down[2] == 1 and fingers_down[3] == 1:
             self.state = "two up"
-        else:
+        elif fingers_down[0] == 0 and fingers_down[1] == 0 and fingers_down[2] == 0 and fingers_down[3] == 0:
             self.state = "open"
+        else:
+            self.state = "transitioning"
 
         if displacement_magnitude > 0.001:
             if self.state == "open":
@@ -95,8 +92,6 @@ class MouseController:
                     mouse2.press(Button.x2)
                     mouse2.release(Button.x2)
             elif self.state == "closed":
-                # print(int(wrist_tracker.displacement[1] * SCROLL_FACTOR))
-                # mouse.wheel(int(wrist_tracker.displacement[1] * SCROLL_FACTOR))
                 if wrist_tracker.displacement[1]/dt > SCROLL_VELOCITY_THRESHOLD:
                     mouse.wheel(1)
                 elif wrist_tracker.displacement[1]/dt < -SCROLL_VELOCITY_THRESHOLD:
@@ -104,7 +99,7 @@ class MouseController:
 
 
         else: #stationary
-            if self.state != "closed":
+            if self.state == "open" and moving_fingers < 2:
                 if self.left_click_debounce:
                     index_finger_tracker = trackers["index finger"]
                     y_vel = index_finger_tracker.displacement[1]/dt
