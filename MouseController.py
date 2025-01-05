@@ -1,6 +1,7 @@
 import math
 import mouse
 import pyautogui
+# import time
 from pynput.mouse import Button, Controller
 
 #SENSIVITY VARS
@@ -10,7 +11,7 @@ JUMP_SPEED_THRESHOLD = 0.25
 JUMP_MULTIPLIER = 2
 
 #CLICKS
-CLICK_VELOCITY = 0.1
+CLICK_VELOCITY = 0.2
 CLICK_DEBOUNCE = 0.15
 SIDE_BUTTON_DEBOUNCE = 0.5
 BACK_BUTTON_VELOCITY_THRESHOLD = 0.25
@@ -30,12 +31,12 @@ def log_curve(x: float, a: float):
 
 finger_names = ["index", "middle", "ring", "pinky"]
 
-mouse2 = Controller()
+mouse2 = Controller() #i need this to access the side buttons
 
+# init_time = time.time()
 class MouseController:
     def __init__(self):
-        self.left_click_debounce = Debounce(CLICK_DEBOUNCE)
-        self.right_click_debounce = Debounce(CLICK_DEBOUNCE)
+        self.click_debounce = Debounce(CLICK_DEBOUNCE)
         self.side_button_debounce = Debounce(SIDE_BUTTON_DEBOUNCE)
         self.pinky_pinch_debounce = Debounce(1)
         self.state = "open"
@@ -103,20 +104,24 @@ class MouseController:
 
             else: #stationary
                 if self.state == "open" and moving_fingers < 2:
-                    if self.left_click_debounce:
+                    if self.click_debounce:
                         index_finger_tracker = trackers["index finger"]
                         y_vel = index_finger_tracker.displacement[1]/dt
 
                         if y_vel > CLICK_VELOCITY:
-                            self.left_click_debounce.activate()
+                            # print("left click", time.time() - init_time)
+
+                            self.click_debounce.activate()
                             mouse.click()
 
-                    if self.right_click_debounce:
+                    if self.click_debounce:
                         right_finger_tracker = trackers["middle finger"]
                         y_vel = right_finger_tracker.displacement[1] / dt
 
                         if y_vel > CLICK_VELOCITY:
-                            self.right_click_debounce.activate()
+                            # print("right click", time.time() - init_time)
+
+                            self.click_debounce.activate()
                             mouse.right_click()
 
 
@@ -131,3 +136,8 @@ class MouseController:
             self.pinky_pinch_debounce.activate()
 
             self.active = not self.active
+
+            if self.active:
+                print("Activated the mouse")
+            else:
+                print("Deactivated the mouse")
