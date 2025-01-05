@@ -17,7 +17,9 @@ if __name__ == "__main__":
         dt = max(now - prev_time, 1/100)
 
         hand_tracker.update(dt)
-        mouse_controller.update(hand_tracker.trackers, dt)
+
+        if hand_tracker.can_see_hand:
+            mouse_controller.update(hand_tracker.trackers, dt)
 
         prev_time = now
 

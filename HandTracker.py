@@ -34,6 +34,7 @@ class HandTracker:
         self.mp_drawing = mediapipe.solutions.drawing_utils
         self.landmark_result = None
         self.processing_hand = False
+        self.can_see_hand = False
 
         self.trackers = {
             "index finger": PointTracker(3,8),
@@ -44,6 +45,7 @@ class HandTracker:
             "middle knuckle": PointTracker(3, 9),
             "ring knuckle": PointTracker(3, 13),
             "pinky knuckle": PointTracker(3, 17),
+            "thumb": PointTracker(3, 4),
             "wrist": PointTracker(3,0),
         }
 
@@ -110,6 +112,7 @@ class HandTracker:
 
         # update previous position
         self.previous_time = now
+        self.can_see_hand = detected_hand
 
         if self.debug_mode:
             mp_image_np = numpy.array(mp_image.numpy_view())
