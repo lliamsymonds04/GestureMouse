@@ -1,7 +1,6 @@
 import math
 import mouse
 import pyautogui
-# import time
 from pynput.mouse import Button, Controller
 
 #SENSIVITY VARS
@@ -11,10 +10,13 @@ JUMP_SPEED_THRESHOLD = 0.25
 JUMP_MULTIPLIER = 2
 
 #CLICKS
-CLICK_VELOCITY = 0.2
+CLICK_VELOCITY = 0.15
 CLICK_DEBOUNCE = 0.15
 SIDE_BUTTON_DEBOUNCE = 0.5
 BACK_BUTTON_VELOCITY_THRESHOLD = 0.25
+PINCH_THRESHOLD = 0.02
+PINKY_PINCH_DEBOUNCE = 1
+INDEX_PINCH_DEBOUNCE = 0.2
 
 #scrolling
 SCROLL_FACTOR = 50
@@ -31,16 +33,18 @@ def log_curve(x: float, a: float):
 
 finger_names = ["index", "middle", "ring", "pinky"]
 
-mouse2 = Controller() #i need this to access the side buttons
+mouse2 = Controller() # I need this to access the side buttons
 
 # init_time = time.time()
 class MouseController:
     def __init__(self):
         self.click_debounce = Debounce(CLICK_DEBOUNCE)
         self.side_button_debounce = Debounce(SIDE_BUTTON_DEBOUNCE)
-        self.pinky_pinch_debounce = Debounce(1)
+        self.pinky_pinch_debounce = Debounce(PINKY_PINCH_DEBOUNCE)
+        self.index_pinch_debounce = Debounce(INDEX_PINCH_DEBOUNCE)
         self.state = "open"
         self.active = False
+        self.dragging = False
 
     def update(self, trackers: dict[str, PointTracker], dt: float):
         if self.active:
@@ -69,6 +73,27 @@ class MouseController:
                 self.state = "open"
             else:
                 self.state = "transitioning"
+
+
+            #dragging
+            index_finger = trackers["index finger"]
+            thumb = trackers["thumb"]
+            index_to_thumb_distance = calculate_magnitude((index_finger.x - thumb.x, index_finger.y - thumb.y))
+
+            if self.index_pinch_debounce:
+                if self.dragging:
+                    if index_to_thumb_distance > PINCH_THRESHOLD * 3 or self.state == "closed":
+                        self.index_pinch_debounce.activate()
+
+                        self.dragging = False
+                        mouse.release(button='left')
+                else:
+                    if index_to_thumb_distance < PINCH_THRESHOLD:
+                        self.index_pinch_debounce.activate()
+
+                        self.dragging = True
+                        mouse.press(button='left')
+
 
             if displacement_magnitude > 0.001:
                 if self.state == "open":
@@ -105,8 +130,7 @@ class MouseController:
             else: #stationary
                 if self.state == "open" and moving_fingers < 2:
                     if self.click_debounce:
-                        index_finger_tracker = trackers["index finger"]
-                        y_vel = index_finger_tracker.displacement[1]/dt
+                        y_vel = index_finger.displacement[1]/dt
 
                         if y_vel > CLICK_VELOCITY:
                             # print("left click", time.time() - init_time)
@@ -115,8 +139,8 @@ class MouseController:
                             mouse.click()
 
                     if self.click_debounce:
-                        right_finger_tracker = trackers["middle finger"]
-                        y_vel = right_finger_tracker.displacement[1] / dt
+                        right_finger = trackers["middle finger"]
+                        y_vel = right_finger.displacement[1] / dt
 
                         if y_vel > CLICK_VELOCITY:
                             # print("right click", time.time() - init_time)
@@ -132,7 +156,7 @@ class MouseController:
         d_y = thumb.y - pinky.y
 
         pinky_distance = calculate_magnitude((d_x, d_y))
-        if pinky_distance < 0.02 and self.pinky_pinch_debounce:
+        if pinky_distance < PINCH_THRESHOLD and self.pinky_pinch_debounce:
             self.pinky_pinch_debounce.activate()
 
             self.active = not self.active

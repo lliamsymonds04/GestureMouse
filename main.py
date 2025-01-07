@@ -8,7 +8,7 @@ from MouseController import MouseController
 if __name__ == "__main__":
     pass
 
-    hand_tracker = HandTracker(model_path='Models\\hand_landmarker.task', debug_mode=False)
+    hand_tracker = HandTracker(model_path='Models\\hand_landmarker.task', debug_mode=True)
     mouse_controller = MouseController()
 
     prev_time = time.time()
@@ -16,7 +16,7 @@ if __name__ == "__main__":
         now = time.time()
         dt = max(now - prev_time, 1/100)
 
-        hand_tracker.update(dt)
+        hand_tracker.update()
 
         if hand_tracker.can_see_hand:
             mouse_controller.update(hand_tracker.trackers, dt)
