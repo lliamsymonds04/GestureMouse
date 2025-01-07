@@ -14,16 +14,13 @@ VisionRunningMode = mediapipe.tasks.vision.RunningMode
 
 DEBUG_WINDOW_NAME = "Camera"
 HAND_TO_TRACK = "right"
+HAND_TO_TRACK.capitalize()
 
-#flip the hand bc media pipe labels them wrong
-if HAND_TO_TRACK.lower() == "right":
-    HAND_TO_TRACK = "Left"
-else:
-    HAND_TO_TRACK = "Right"
 
 class HandTracker:
     def __init__(self, model_path: str, debug_mode: bool = False):
         self.cap = cv2.VideoCapture(0)
+
         self.start_time = time.time()
         self.previous_time = self.start_time
         self.model_path = model_path
@@ -69,8 +66,7 @@ class HandTracker:
         self.landmark_result = result
         self.processing_hand = False
 
-    #going to need delta time
-    def update(self, dt: float):
+    def update(self):
         ret, frame = self.cap.read()
 
         if not ret:
@@ -89,18 +85,35 @@ class HandTracker:
         if self.landmark_result is not None:
             result: HandLandmarkerResult = self.landmark_result
 
-            for handedness in result.handedness:
-                hand = handedness[0]
-                if detected_hand or hand.display_name != HAND_TO_TRACK:
-                    continue
 
+            landmarks = None
+            if len(result.handedness) == 1:
+                print(1)
+                hand = result.handedness[0][0]
+                if hand.display_name != HAND_TO_TRACK: #mediapipe labels the hands wrong
+                    landmarks = result.hand_landmarks[0]
+                    detected_hand = True
+
+            elif len(result.handedness) == 2:
+                x_positions = list()
+                for handedness in result.handedness:
+                    hand = handedness[0]
+
+                    hand_landmarks = result.hand_landmarks[hand.index]
+                    marker = hand_landmarks[0]
+                    x_positions.append(marker.x)
+
+                hand_index = 0
+                if HAND_TO_TRACK == "Right":
+                    hand_index = x_positions[0] < x_positions[1] and 1 or 0
+                elif HAND_TO_TRACK == "Left":
+                    hand_index = x_positions[0] < x_positions[1] and 0 or 1
+
+                landmarks = result.hand_landmarks[hand_index]
                 detected_hand = True
 
-                if len(result.hand_landmarks) > 1:
-                    landmarks = result.hand_landmarks[hand.index]
-                else:
-                    landmarks = result.hand_landmarks[0]
 
+            if landmarks is not None:
                 #update the point trackers
                 for _, tracker in self.trackers.items():
                     mark = landmarks[tracker.landmark_index]
