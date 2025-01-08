@@ -3,11 +3,14 @@ import mouse
 import pyautogui
 from pynput.mouse import Button, Controller
 
+from PointTracker import PointTracker
+from Debounce import Debounce
+
 #SENSIVITY VARS
 SENSITIVITY_X = 1.5
 SENSITIVITY_Y = 1.5
-JUMP_SPEED_THRESHOLD = 0.25
-JUMP_MULTIPLIER = 2
+JUMP_SPEED_THRESHOLD = 0.2
+JUMP_MULTIPLIER = 2.5
 
 #CLICKS
 CLICK_VELOCITY = 0.15
@@ -22,20 +25,13 @@ INDEX_PINCH_DEBOUNCE = 0.2
 SCROLL_FACTOR = 50
 SCROLL_VELOCITY_THRESHOLD = 0.25
 
-from PointTracker import PointTracker
-from Debounce import Debounce
-
-def calculate_magnitude(v: (float, float)) -> float:
-    return math.sqrt(pow(v[0], 2) + pow(v[1], 2))
-
-def log_curve(x: float, a: float):
-    return math.copysign(math.log(abs(x) + 1) + 1, x) * a
-
 finger_names = ["index", "middle", "ring", "pinky"]
 
 mouse2 = Controller() # I need this to access the side buttons
 
-# init_time = time.time()
+def calculate_magnitude(v: (float, float)) -> float:
+    return math.sqrt(pow(v[0], 2) + pow(v[1], 2))
+
 class MouseController:
     def __init__(self):
         self.click_debounce = Debounce(CLICK_DEBOUNCE)
