@@ -41,14 +41,14 @@ class HandTracker:
         self.trackers = {
             "index finger": PointTracker(1,8),
             "middle finger": PointTracker(1, 12),
-            "ring finger": PointTracker(3, 16),
-            "pinky finger": PointTracker(3, 20),
-            "index knuckle": PointTracker(3, 5),
-            "middle knuckle": PointTracker(3, 9),
-            "ring knuckle": PointTracker(3, 13),
-            "pinky knuckle": PointTracker(3, 17),
+            "ring finger": PointTracker(1, 16),
+            "pinky finger": PointTracker(1, 20),
+            "index knuckle": PointTracker(1, 5),
+            "middle knuckle": PointTracker(1, 9),
+            "ring knuckle": PointTracker(1, 13),
+            "pinky knuckle": PointTracker(1, 17),
             "thumb": PointTracker(1, 4),
-            "wrist": PointTracker(3,0),
+            "wrist": PointTracker(4,0),
         }
 
         options = mediapipe.tasks.vision.HandLandmarkerOptions(
