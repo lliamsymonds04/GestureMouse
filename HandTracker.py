@@ -2,7 +2,6 @@ import cv2
 import mediapipe
 import numpy
 import time
-import collections
 
 from PointTracker import PointTracker
 
