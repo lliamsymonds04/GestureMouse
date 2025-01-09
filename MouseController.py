@@ -19,13 +19,15 @@ CLICK_DEBOUNCE = 0.15
 SIDE_BUTTON_DEBOUNCE = 0.5
 BACK_BUTTON_VELOCITY_THRESHOLD = 0.25
 PINKY_PINCH_THRESHOLD = 0.02
-CLICK_PINCH_THRESHOLD = 0.02
+CLICK_PINCH_THRESHOLD = 0.025
 PINKY_PINCH_DEBOUNCE = 1
 INDEX_PINCH_DEBOUNCE = 0.2
 
 #scrolling
 SCROLL_FACTOR = 50
 SCROLL_VELOCITY_THRESHOLD = 0.25
+
+STATIONARY_DISPLACEMENT = 0.001
 
 finger_names = ["index", "middle", "ring", "pinky"]
 left_right = ["left", "right"]
@@ -39,19 +41,16 @@ init_time = time.time()
 
 class MouseController:
     def __init__(self, debug_mode: bool):
+        self.debug_mode = debug_mode
+        self.state = "open"
+        self.active = False
+        self.is_left_click_held = False
+        self.is_right_click_held = False
+
         self.click_debounce = Debounce(CLICK_DEBOUNCE)
         self.side_button_debounce = Debounce(SIDE_BUTTON_DEBOUNCE)
         self.pinky_pinch_debounce = Debounce(PINKY_PINCH_DEBOUNCE)
         self.index_pinch_debounce = Debounce(INDEX_PINCH_DEBOUNCE)
-        self.state = "open"
-        self.active = False
-        self.dragging = False
-        self.debug_mode = debug_mode
-        self.can_left_click = True
-        self.can_right_click = True
-
-        self.is_left_click_held = False
-        self.is_right_click_held = False
 
     def output_message(self, msg: str):
         if self.debug_mode:
@@ -114,7 +113,7 @@ class MouseController:
 
             self.state = new_state
 
-            if displacement_magnitude > 0.001:
+            if displacement_magnitude > STATIONARY_DISPLACEMENT:
                 if self.state == "open":
                     screen_width, screen_height = pyautogui.size()
 
@@ -146,10 +145,11 @@ class MouseController:
                         mouse.wheel(-1)
 
 
-            else: #stationary
-                if self.state == "open":
-                    fingers = ["index", "middle"]
+            # else: #stationary
+            if self.state == "open":
+                fingers = ["index", "middle"]
 
+                if self.click_debounce:
                     for i in range(2):
                         button = left_right[i]
                         tracker = trackers[f"{fingers[i]} finger"]
@@ -159,18 +159,16 @@ class MouseController:
 
                         if distance_to_thumb < CLICK_PINCH_THRESHOLD and not is_button_down:
                             mouse.press(button=button)
+                            self.click_debounce.activate()
                             self.set_mouse_button_down(button, True)
                             self.output_message(f"{button} button pressed: {time.time() - init_time}")
 
-                        if distance_to_thumb > CLICK_PINCH_THRESHOLD and is_button_down:
+                        if distance_to_thumb > CLICK_PINCH_THRESHOLD and is_button_down and displacement_magnitude <= STATIONARY_DISPLACEMENT:
                             mouse.release(button=button)
+                            self.click_debounce.activate()
+
                             self.set_mouse_button_down(button, False)
                             self.output_message(f"{button} button released: {time.time() - init_time}")
-
-
-
-
-
 
 
         pinky = trackers["pinky finger"]
