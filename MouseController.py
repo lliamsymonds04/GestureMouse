@@ -2,13 +2,14 @@ import math
 import mouse
 import pyautogui
 from pynput.mouse import Button, Controller
+import time
 
 from PointTracker import PointTracker
 from Debounce import Debounce
 
 #SENSIVITY VARS
-SENSITIVITY_X = 1.5
-SENSITIVITY_Y = 1.5
+SENSITIVITY_X = 1.75
+SENSITIVITY_Y = 1.75
 JUMP_SPEED_THRESHOLD = 0.2
 JUMP_MULTIPLIER = 2.5
 
@@ -17,7 +18,8 @@ CLICK_VELOCITY = 0.15
 CLICK_DEBOUNCE = 0.15
 SIDE_BUTTON_DEBOUNCE = 0.5
 BACK_BUTTON_VELOCITY_THRESHOLD = 0.25
-PINCH_THRESHOLD = 0.02
+PINKY_PINCH_THRESHOLD = 0.02
+INDEX_PINCH_THRESHOLD = 0.015
 PINKY_PINCH_DEBOUNCE = 1
 INDEX_PINCH_DEBOUNCE = 0.2
 
@@ -26,14 +28,17 @@ SCROLL_FACTOR = 50
 SCROLL_VELOCITY_THRESHOLD = 0.25
 
 finger_names = ["index", "middle", "ring", "pinky"]
+left_right = ["left", "right"]
 
 mouse2 = Controller() # I need this to access the side buttons
 
 def calculate_magnitude(v: (float, float)) -> float:
     return math.sqrt(pow(v[0], 2) + pow(v[1], 2))
 
+init_time = time.time()
+
 class MouseController:
-    def __init__(self):
+    def __init__(self, debug_mode: bool):
         self.click_debounce = Debounce(CLICK_DEBOUNCE)
         self.side_button_debounce = Debounce(SIDE_BUTTON_DEBOUNCE)
         self.pinky_pinch_debounce = Debounce(PINKY_PINCH_DEBOUNCE)
@@ -41,54 +46,91 @@ class MouseController:
         self.state = "open"
         self.active = False
         self.dragging = False
+        self.debug_mode = debug_mode
+        self.can_left_click = True
+        self.can_right_click = True
+
+    def output_message(self, msg: str):
+        if self.debug_mode:
+            print(msg)
+
+    def get_can_click(self, side: str):
+        if side == "left":
+            return self.can_left_click
+        elif side == "right":
+            return self.can_right_click
+
+    def set_can_click(self, side: str, v: bool):
+        if side == "left":
+            self.can_left_click = v
+        elif side == "right":
+            self.can_right_click = v
 
     def update(self, trackers: dict[str, PointTracker], dt: float):
+        thumb = trackers["thumb"]
+
         if self.active:
             wrist_tracker = trackers["wrist"]
             displacement_magnitude = calculate_magnitude(wrist_tracker.displacement)
+            wrist_velocity = displacement_magnitude/dt
 
             fingers_down = [0,0,0,0]
+            fingers_down_sum = 0
             moving_fingers = 0
             for i, finger_name in enumerate(finger_names):
                 finger_tracker = trackers[f"{finger_name} finger"]
                 knuckle_tracker = trackers[f"{finger_name} knuckle"]
 
                 y_vel = (finger_tracker.displacement[1] - wrist_tracker.displacement[1]) / dt
-                if abs(y_vel) > CLICK_VELOCITY:
-                    moving_fingers += 1
-                    break
+
 
                 if finger_tracker.y > knuckle_tracker.y:
                     fingers_down[i] = 1
+                    fingers_down_sum += 1
 
-            if fingers_down[0] == 1 and fingers_down[1] == 1 and fingers_down[2] == 1 and fingers_down[3] == 1:
-                self.state = "closed"
+                if abs(y_vel) > CLICK_VELOCITY * 0.3:
+                    moving_fingers += 1
+
+
+
+            # if fingers_down[0] == 1 and fingers_down[1] == 1 and fingers_down[2] == 1 and fingers_down[3] == 1:
+            if self.state == "closed" and wrist_velocity > 0.05:
+                # new_state = "closed"
+                pass
+            if fingers_down_sum > 3:
+                new_state = "closed"
             elif fingers_down[0] == 0 and fingers_down[1] == 0 and fingers_down[2] == 1 and fingers_down[3] == 1:
-                self.state = "two up"
-            elif fingers_down[0] == 0 and fingers_down[1] == 0 and fingers_down[2] == 0 and fingers_down[3] == 0:
-                self.state = "open"
+                new_state = "two up"
+            # elif fingers_down[0] == 0 and fingers_down[1] == 0 and fingers_down[2] == 0 and fingers_down[3] == 0:
+            elif fingers_down_sum == 0:
+                new_state = "open"
             else:
-                self.state = "transitioning"
+                new_state = "transitioning"
 
+            if self.debug_mode and new_state != self.state:
+                print(new_state, time.time()-init_time)
+
+            self.state = new_state
 
             #dragging
             index_finger = trackers["index finger"]
-            thumb = trackers["thumb"]
             index_to_thumb_distance = calculate_magnitude((index_finger.x - thumb.x, index_finger.y - thumb.y))
 
             if self.index_pinch_debounce:
                 if self.dragging:
-                    if index_to_thumb_distance > PINCH_THRESHOLD * 3 or self.state == "closed":
+                    if index_to_thumb_distance > INDEX_PINCH_THRESHOLD * 4 or self.state == "closed":
                         self.index_pinch_debounce.activate()
 
                         self.dragging = False
                         mouse.release(button='left')
+                        self.output_message("released")
                 else:
-                    if index_to_thumb_distance < PINCH_THRESHOLD:
+                    if index_to_thumb_distance < INDEX_PINCH_THRESHOLD:
                         self.index_pinch_debounce.activate()
 
                         self.dragging = True
                         mouse.press(button='left')
+                        self.output_message("pinch")
 
 
             if displacement_magnitude > 0.001:
@@ -124,25 +166,53 @@ class MouseController:
 
 
             else: #stationary
-                if self.state == "open" and moving_fingers < 2:
-                    if self.click_debounce:
-                        y_vel = index_finger.displacement[1]/dt
+                # if moving_fingers >=2 :
+                #     print("fingers moving")
+                if self.state == "open"  and not self.dragging: #and moving_fingers < 2
+                    # `if self.click_debounce:
+                    #     y_vel = index_finger.displacement[1]/dt
+                    #    thumb_vel = calculate_magnitude(thumb.displacement)/dt
+                    #
+                    #     if y_vel > CLICK_VELOCITY and thumb_vel < CLICK_VELOCITY * 0.5:
+                    #         self.output_message("left click " + str(time.time() - init_time))
+                    #
+                    #         self.click_debounce.activate()
+                    #         mouse.click()
+                    # index_y_vel = index_finger.displacement[1]/dt
+                    #
 
-                        if y_vel > CLICK_VELOCITY:
-                            # print("left click", time.time() - init_time)
+                    # for side in left_right:
+                    fingers = ["index", "middle"]
+                    thumb_vel = calculate_magnitude(thumb.displacement)/dt
 
-                            self.click_debounce.activate()
-                            mouse.click()
+                    for i in range(2):
+                        click = left_right[i]
+                        tracker = trackers[f"{fingers[i]} finger"]
 
-                    if self.click_debounce:
-                        right_finger = trackers["middle finger"]
-                        y_vel = right_finger.displacement[1] / dt
+                        finger_y_vel = tracker.displacement[1]/dt
 
-                        if y_vel > CLICK_VELOCITY:
-                            # print("right click", time.time() - init_time)
 
-                            self.click_debounce.activate()
-                            mouse.right_click()
+                        if self.get_can_click(click):
+                            if finger_y_vel > CLICK_VELOCITY and thumb_vel < CLICK_VELOCITY * 0.5:
+                                self.output_message(f"{click} click " + str(time.time() - init_time))
+
+                                mouse.click(button=click)
+                                self.set_can_click(click, False)
+                        else:
+                            if finger_y_vel < 0:
+                                self.set_can_click(click, True)
+                                self.output_message(f"{click }click reset")
+
+
+                    # if self.click_debounce:
+                    #     right_finger = trackers["middle finger"]
+                    #     y_vel = right_finger.displacement[1] / dt
+                    #
+                    #     if y_vel > CLICK_VELOCITY:
+                    #         self.output_message("right click " + str(time.time() - init_time))
+                    #
+                    #         self.click_debounce.activate()
+                    #         mouse.right_click()
 
 
         thumb = trackers["thumb"]
@@ -152,7 +222,7 @@ class MouseController:
         d_y = thumb.y - pinky.y
 
         pinky_distance = calculate_magnitude((d_x, d_y))
-        if pinky_distance < PINCH_THRESHOLD and self.pinky_pinch_debounce:
+        if pinky_distance < PINKY_PINCH_THRESHOLD and self.pinky_pinch_debounce:
             self.pinky_pinch_debounce.activate()
 
             self.active = not self.active

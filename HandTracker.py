@@ -12,10 +12,7 @@ HandLandmarkerOptions = mediapipe.tasks.vision.HandLandmarkerOptions
 HandLandmarkerResult = mediapipe.tasks.vision.HandLandmarkerResult
 VisionRunningMode = mediapipe.tasks.vision.RunningMode
 
-DEBUG_WINDOW_NAME = "Camera"
-HAND_TO_TRACK = "right"
-HAND_TO_TRACK.capitalize()
-
+HAND_TO_TRACK = "Right"
 
 class HandTracker:
     def __init__(self, model_path: str, debug_mode: bool = False):
@@ -58,8 +55,8 @@ class HandTracker:
 
         self.landmarker = mediapipe.tasks.vision.HandLandmarker.create_from_options(options)
 
-        if debug_mode:
-            cv2.namedWindow(DEBUG_WINDOW_NAME, cv2.WINDOW_NORMAL)
+        # if debug_mode:
+        #     cv2.namedWindow(DEBUG_WINDOW_NAME, cv2.WINDOW_NORMAL)
 
 
     def handle_detection(self, result: HandLandmarkerResult, output_image: mediapipe.Image, timestamp_ms: int):
@@ -88,8 +85,8 @@ class HandTracker:
 
             landmarks = None
             if len(result.handedness) == 1:
-                print(1)
                 hand = result.handedness[0][0]
+                # print(hand.display_name)
                 if hand.display_name != HAND_TO_TRACK: #mediapipe labels the hands wrong
                     landmarks = result.hand_landmarks[0]
                     detected_hand = True
@@ -138,8 +135,9 @@ class HandTracker:
 
                     cv2.circle(mp_image_np, (x, y), 10, (255, 0, 0), 2)
 
-            cv2.imshow(DEBUG_WINDOW_NAME, mp_image_np)
+            # cv2.imshow(DEBUG_WINDOW_NAME, mp_image_np)
 
+        return mp_image_np
 
     def close(self):
         self.cap.release()
