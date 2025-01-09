@@ -11,7 +11,7 @@ from Debounce import Debounce
 SENSITIVITY_X = 1.75
 SENSITIVITY_Y = 1.75
 JUMP_SPEED_THRESHOLD = 0.2
-JUMP_MULTIPLIER = 2.5
+JUMP_MULTIPLIER = 3
 
 #CLICKS
 CLICK_VELOCITY = 0.15
@@ -19,7 +19,7 @@ CLICK_DEBOUNCE = 0.15
 SIDE_BUTTON_DEBOUNCE = 0.5
 BACK_BUTTON_VELOCITY_THRESHOLD = 0.25
 PINKY_PINCH_THRESHOLD = 0.02
-CLICK_PINCH_THRESHOLD = 0.025
+CLICK_PINCH_THRESHOLD = 0.03
 PINKY_PINCH_DEBOUNCE = 1
 INDEX_PINCH_DEBOUNCE = 0.2
 
@@ -78,24 +78,17 @@ class MouseController:
 
             fingers_down = [0,0,0,0]
             fingers_down_sum = 0
-            moving_fingers = 0
             for i, finger_name in enumerate(finger_names):
                 finger_tracker = trackers[f"{finger_name} finger"]
                 knuckle_tracker = trackers[f"{finger_name} knuckle"]
-
-                y_vel = (finger_tracker.displacement[1] - wrist_tracker.displacement[1]) / dt
-
 
                 if finger_tracker.y > knuckle_tracker.y:
                     fingers_down[i] = 1
                     fingers_down_sum += 1
 
-                if abs(y_vel) > CLICK_VELOCITY * 0.3:
-                    moving_fingers += 1
-
 
             # if fingers_down[0] == 1 and fingers_down[1] == 1 and fingers_down[2] == 1 and fingers_down[3] == 1:
-            if self.state == "closed" and wrist_velocity > 0.05:
+            if self.state == "closed" and wrist_velocity > 0.01:
                 # new_state = "closed"
                 pass
             if fingers_down_sum > 3:
@@ -149,26 +142,26 @@ class MouseController:
             if self.state == "open":
                 fingers = ["index", "middle"]
 
-                if self.click_debounce:
-                    for i in range(2):
-                        button = left_right[i]
-                        tracker = trackers[f"{fingers[i]} finger"]
+                # if self.click_debounce:
+                for i in range(2):
+                    button = left_right[i]
+                    tracker = trackers[f"{fingers[i]} finger"]
 
-                        distance_to_thumb = calculate_magnitude((tracker.x - thumb.x, tracker.y - thumb.y))
-                        is_button_down = self.get_mouse_button_down(button)
+                    distance_to_thumb = calculate_magnitude((tracker.x - thumb.x, tracker.y - thumb.y))
+                    is_button_down = self.get_mouse_button_down(button)
 
-                        if distance_to_thumb < CLICK_PINCH_THRESHOLD and not is_button_down:
-                            mouse.press(button=button)
-                            self.click_debounce.activate()
-                            self.set_mouse_button_down(button, True)
-                            self.output_message(f"{button} button pressed: {time.time() - init_time}")
+                    if distance_to_thumb < CLICK_PINCH_THRESHOLD and not is_button_down and self.click_debounce:
+                        mouse.press(button=button)
+                        self.click_debounce.activate()
+                        self.set_mouse_button_down(button, True)
+                        self.output_message(f"{button} button pressed: {time.time() - init_time}")
 
-                        if distance_to_thumb > CLICK_PINCH_THRESHOLD and is_button_down and displacement_magnitude <= STATIONARY_DISPLACEMENT:
-                            mouse.release(button=button)
-                            self.click_debounce.activate()
+                    if distance_to_thumb > CLICK_PINCH_THRESHOLD * 1.3 and is_button_down and displacement_magnitude <= STATIONARY_DISPLACEMENT:
+                        mouse.release(button=button)
+                        self.click_debounce.activate()
 
-                            self.set_mouse_button_down(button, False)
-                            self.output_message(f"{button} button released: {time.time() - init_time}")
+                        self.set_mouse_button_down(button, False)
+                        self.output_message(f"{button} button released: {time.time() - init_time}")
 
 
         pinky = trackers["pinky finger"]
