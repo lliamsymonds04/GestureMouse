@@ -31,15 +31,15 @@ class HandTracker:
         self.can_see_hand = False
 
         self.trackers = {
-            "index finger": PointTracker(3,8),
-            "middle finger": PointTracker(3, 12),
+            "index finger": PointTracker(1,8),
+            "middle finger": PointTracker(1, 12),
             "ring finger": PointTracker(3, 16),
             "pinky finger": PointTracker(3, 20),
             "index knuckle": PointTracker(3, 5),
             "middle knuckle": PointTracker(3, 9),
             "ring knuckle": PointTracker(3, 13),
             "pinky knuckle": PointTracker(3, 17),
-            "thumb": PointTracker(3, 4),
+            "thumb": PointTracker(1, 4),
             "wrist": PointTracker(3,0),
         }
 
